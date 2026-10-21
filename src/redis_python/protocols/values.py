@@ -1,7 +1,6 @@
 """Value objects for the supported RESP2 protocol types."""
-
+from __future__ import annotations
 from typing import ClassVar
-
 
 class RESP:
     """Base for RESP2 values sharing a CRLF terminator."""
@@ -64,4 +63,14 @@ class BulkString(RESP):
         return -1 if self.data is None else len(self.data)
 
 
-RESPValue = SimpleString | SimpleError | Integer | BulkString
+class Array(RESP):
+    prefix: ClassVar[bytes] = b"*"
+
+    def __init__(self, data: list[RESPValue] | None) -> None:
+        self.data = data
+
+    @property
+    def length(self) -> int:
+        return -1 if self.data is None else len(self.data)
+
+RESPValue = SimpleString | SimpleError | Integer | BulkString | Array

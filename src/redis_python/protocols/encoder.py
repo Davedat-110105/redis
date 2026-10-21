@@ -1,6 +1,6 @@
 """Encode supported RESP2 values as wire bytes."""
 
-from .values import BulkString, Integer, RESPValue, SimpleError, SimpleString
+from .values import Array, BulkString, Integer, RESPValue, SimpleError, SimpleString
 
 
 class RESPEncoder:
@@ -16,6 +16,15 @@ class RESPEncoder:
                 payload = text.encode("utf-8")
             case Integer(data=number):
                 payload = str(number).encode("ascii")
+            case Array(data=content):
+                if content is None:
+                    payload = b"-1"
+                else:
+                    length = str(self.data.length).encode("ascii")
+                    header = self.data.prefix + length + self.data.final_terminator
+                    return header + b"".join(
+                        RESPEncoder(item).encode() for item in content
+                    )
             case BulkString(data=content):
                 if content is None:
                     payload = b"-1"
