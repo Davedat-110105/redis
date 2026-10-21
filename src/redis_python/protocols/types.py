@@ -38,6 +38,7 @@ class SimpleError(RESP):
         if "\r" in data or "\n" in data:
             raise ValueError("SimpleError cannot contain CR or LF")
 
+
 class Integers(RESP):
     """Hold a signed integer reply, excluding Python booleans."""
 
@@ -61,3 +62,6 @@ class BulkStrings(RESP):
     def length(self) -> int:
         """Return the byte length of the payload, or -1 when null."""
         return -1 if self.data is None else len(self.data)
+
+
+RESPValue = SimpleString | SimpleError | Integers | BulkStrings

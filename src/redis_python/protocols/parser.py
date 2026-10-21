@@ -1,8 +1,6 @@
 """Decode supported RESP2 values from a byte buffer."""
 
-from .types import BulkStrings, Integers, SimpleError, SimpleString
-
-RESPValue = SimpleString | SimpleError | Integers | BulkStrings
+from .types import BulkStrings, Integers, RESPValue, SimpleError, SimpleString
 
 
 class Decoder:
