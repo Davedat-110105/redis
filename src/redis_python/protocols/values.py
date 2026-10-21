@@ -39,7 +39,7 @@ class SimpleError(RESP):
             raise ValueError("SimpleError cannot contain CR or LF")
 
 
-class Integers(RESP):
+class Integer(RESP):
     """Hold a signed integer reply, excluding Python booleans."""
 
     prefix: ClassVar[bytes] = b":"
@@ -50,7 +50,7 @@ class Integers(RESP):
         self.data = data
 
 
-class BulkStrings(RESP):
+class BulkString(RESP):
     """Hold raw bytes, or None for a null bulk string."""
 
     prefix: ClassVar[bytes] = b"$"
@@ -64,4 +64,4 @@ class BulkStrings(RESP):
         return -1 if self.data is None else len(self.data)
 
 
-RESPValue = SimpleString | SimpleError | Integers | BulkStrings
+RESPValue = SimpleString | SimpleError | Integer | BulkString

@@ -1,24 +1,24 @@
 from src.redis_python.store import Store
 
 
-def test_SET():
+def test_set():
     store = Store()
-    assert store.SET("name", "Huy") == None
+    assert store.set("name", "Huy") == None
 
-def test_EXIST():
+def test_exists():
     store = Store()
-    store.SET("name", "Huy")
-    store.SET("test", "10")
-    assert store.EXISTS("name") == True
+    store.set("name", "Huy")
+    store.set("test", "10")
+    assert store.exists("name") == True
 
-def test_DEL():
+def test_delete():
     store = Store()
-    store.SET("name", "Huy")
-    store.SET("test", "10")
-    assert store.DEL("name") == True
+    store.set("name", "Huy")
+    store.set("test", "10")
+    assert store.delete("name") == True
 
-def test_GET():
+def test_get():
     store = Store()
-    store.SET("name", "Huy")
-    store.SET("test", "10")
-    assert store.GET("name") == "Huy"
+    store.set("name", "Huy")
+    store.set("test", "10")
+    assert store.get("name") == "Huy"

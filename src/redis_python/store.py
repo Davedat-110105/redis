@@ -7,7 +7,7 @@ class Store:
     def __init__(self):
         self.data: List = []
 
-    def SET(self, key: str, value: str) -> None:
+    def set(self, key: str, value: str) -> None:
         """Insert a key or replace its existing value."""
         index: int | None = self._find(key)
         if (index is not None):
@@ -17,7 +17,7 @@ class Store:
             self.data.append({"key": key, "value": value})
 
 
-    def GET(self, key: str) -> Any | None:
+    def get(self, key: str) -> Any | None:
         """Return the value for a key, or None if it is absent."""
         value: int | None = self._find(key)
         if (value is not None):
@@ -26,7 +26,7 @@ class Store:
             return None
 
 
-    def DEL(self, key: str) -> bool:
+    def delete(self, key: str) -> bool:
         """Delete a key and report whether it existed."""
         value: int | None = self._find(key)
         if (value is not None):
@@ -35,7 +35,7 @@ class Store:
         else:
             return False
 
-    def EXISTS(self, key: str) -> bool:
+    def exists(self, key: str) -> bool:
         """Return whether a key exists in the store."""
         return self._find(key) is not None
 

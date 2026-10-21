@@ -1,9 +1,9 @@
-"""Decode supported RESP2 values from a byte buffer."""
+"""Parse supported RESP2 values from a byte buffer."""
 
-from .types import BulkStrings, Integers, RESPValue, SimpleError, SimpleString
+from .values import BulkString, Integer, RESPValue, SimpleError, SimpleString
 
 
-class Decoder:
+class RESPParser:
     """Read consecutive RESP2 values from a byte buffer."""
 
     def __init__(self, data: bytes) -> None:
@@ -26,8 +26,8 @@ class Decoder:
             raise ValueError("Invalid RESP2 integer")
         return int(value)
 
-    def parsing(self) -> RESPValue:
-        """Decode the next value and advance the cursor on success.
+    def parse(self) -> RESPValue:
+        """Parse the next value and advance the cursor on success.
 
         Raises:
             EOFError: If the buffer ends before the value is complete.
@@ -40,7 +40,7 @@ class Decoder:
         if prefix in (b"+", b"-", b":"):
             line, next_cursor = self._read_line(self.cursor + 1)
             if prefix == b":":
-                value: RESPValue = Integers(self._parse_integer(line))
+                value: RESPValue = Integer(self._parse_integer(line))
             else:
                 try:
                     text = line.decode("utf-8")
@@ -51,7 +51,7 @@ class Decoder:
             line, next_cursor = self._read_line(self.cursor + 1)
             length = self._parse_integer(line)
             if length == -1:
-                value = BulkStrings(None)
+                value = BulkString(None)
             elif length < -1:
                 raise ValueError("Invalid RESP2 bulk string length")
             else:
@@ -60,7 +60,7 @@ class Decoder:
                     raise EOFError("Incomplete RESP2 bulk string")
                 if self.data[end : end + 2] != b"\r\n":
                     raise ValueError("Missing RESP2 bulk string terminator")
-                value = BulkStrings(self.data[next_cursor:end])
+                value = BulkString(self.data[next_cursor:end])
                 next_cursor = end + 2
         else:
             raise ValueError(f"Unsupported RESP2 prefix: {prefix!r}")

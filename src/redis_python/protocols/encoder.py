@@ -1,22 +1,22 @@
 """Encode supported RESP2 values as wire bytes."""
 
-from .types import BulkStrings, Integers, RESPValue, SimpleError, SimpleString
+from .values import BulkString, Integer, RESPValue, SimpleError, SimpleString
 
 
-class Encoder:
+class RESPEncoder:
     """Serialize a RESP2 value without performing network I/O."""
 
     def __init__(self, data: RESPValue) -> None:
         self.data = data
 
-    def convert(self) -> bytes:
+    def encode(self) -> bytes:
         """Return wire bytes, raising TypeError for unsupported values."""
         match self.data:
             case SimpleString(data=text) | SimpleError(data=text):
                 payload = text.encode("utf-8")
-            case Integers(data=number):
+            case Integer(data=number):
                 payload = str(number).encode("ascii")
-            case BulkStrings(data=content):
+            case BulkString(data=content):
                 if content is None:
                     payload = b"-1"
                 else:
