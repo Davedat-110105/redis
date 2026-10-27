@@ -1,4 +1,4 @@
-from typing_extensions import Any, List
+from typing import Any, List
 
 
 class Store:
