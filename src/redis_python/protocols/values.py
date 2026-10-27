@@ -1,10 +1,14 @@
 """Value objects for the supported RESP2 protocol types."""
+
 from __future__ import annotations
-from typing import ClassVar
+
 from abc import ABC, abstractmethod
+from typing import ClassVar
+
 
 class RESP(ABC):
     """Base for RESP2 values sharing a CRLF terminator."""
+
     prefix: ClassVar[bytes]
     final_terminator: ClassVar[bytes] = b"\r\n"
 
@@ -29,6 +33,7 @@ class SimpleString(RESP):
 
     def encode(self) -> bytes:
         return self.prefix + self.data.encode("utf-8") + self.final_terminator
+
 
 class SimpleError(RESP):
     """Hold an error reply as text rather than a Python exception."""
@@ -62,7 +67,6 @@ class Integer(RESP):
         return self.prefix + str(self.data).encode("ascii") + self.final_terminator
 
 
-
 class BulkString(RESP):
     """Hold raw bytes, or None for a null bulk string."""
 
@@ -84,7 +88,10 @@ class BulkString(RESP):
         payload = length + self.final_terminator + self.data
         return self.prefix + payload + self.final_terminator
 
+
 class Array(RESP):
+    """Hold a list of RESP values, or None for a null array."""
+
     prefix: ClassVar[bytes] = b"*"
 
     def __init__(self, data: list[RESPValue] | None) -> None:
@@ -92,14 +99,17 @@ class Array(RESP):
 
     @property
     def length(self) -> int:
+        """Return the number of items, or -1 when null."""
         return -1 if self.data is None else len(self.data)
 
     def encode(self) -> bytes:
+        header = self.prefix + str(self.length).encode("ascii") + self.final_terminator
         if self.data is None:
-            return self.prefix + str(self.length).encode("ascii") + self.final_terminator
-        result = self.prefix + str(self.length).encode("ascii") + self.final_terminator
+            return header
+        result = header
         for item in self.data:
             result += item.encode()
         return result
+
 
 RESPValue = SimpleString | SimpleError | Integer | BulkString | Array
