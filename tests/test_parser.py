@@ -1,7 +1,13 @@
 import pytest
 
 from src.redis_python.protocols.parser import RESPParser
-from src.redis_python.protocols.values import BulkString, Integer, SimpleError, SimpleString
+from src.redis_python.protocols.values import (
+    Array,
+    BulkString,
+    Integer,
+    SimpleError,
+    SimpleString,
+)
 
 
 def test_parse_simple_string():
@@ -68,7 +74,44 @@ def test_parse_consecutive_values():
         parser.parse()
 
 
-@pytest.mark.parametrize("data", [b"+OK", b"$5\r\nabc"])
+def test_parse_command_array():
+    parser = RESPParser(b"*2\r\n$3\r\nGET\r\n$1\r\nk\r\n")
+    result = parser.parse()
+
+    assert isinstance(result, Array)
+    assert [item.data for item in result.data] == [b"GET", b"k"]
+    assert parser.cursor == len(parser.data)
+
+
+def test_parse_empty_array():
+    result = RESPParser(b"*0\r\n").parse()
+
+    assert isinstance(result, Array)
+    assert result.data == []
+
+
+def test_parse_null_array():
+    parser = RESPParser(b"*-1\r\n")
+    result = parser.parse()
+
+    assert isinstance(result, Array)
+    assert result.data is None
+    assert parser.cursor == len(parser.data)
+
+
+def test_parse_nested_array():
+    result = RESPParser(b"*2\r\n:1\r\n*1\r\n+hi\r\n").parse()
+
+    assert isinstance(result, Array)
+    assert result.data[0].data == 1
+    inner = result.data[1]
+    assert isinstance(inner, Array)
+    assert inner.data[0].data == "hi"
+
+
+@pytest.mark.parametrize(
+    "data", [b"+OK", b"$5\r\nabc", b"*2\r\n$3\r\nGET\r\n", b"*1\r\n*1\r\n"]
+)
 def test_incomplete_value_does_not_advance_cursor(data: bytes):
     parser = RESPParser(data)
 
@@ -79,7 +122,15 @@ def test_incomplete_value_does_not_advance_cursor(data: bytes):
 
 @pytest.mark.parametrize(
     "data",
-    [b"+bad\nvalue\r\n", b":nope\r\n", b"$-2\r\n", b"$3\r\nheyXX", b"?x\r\n"],
+    [
+        b"+bad\nvalue\r\n",
+        b":nope\r\n",
+        b"$-2\r\n",
+        b"$3\r\nheyXX",
+        b"?x\r\n",
+        b"*-2\r\n",
+        b"*2\r\n:1\r\n?x\r\n",
+    ],
 )
 def test_invalid_value_does_not_advance_cursor(data: bytes):
     parser = RESPParser(data)
