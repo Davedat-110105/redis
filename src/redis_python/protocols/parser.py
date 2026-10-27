@@ -1,6 +1,6 @@
 """Parse supported RESP2 values from a byte buffer."""
 
-from .values import BulkString, Integer, RESPValue, SimpleError, SimpleString
+from .values import BulkString, Integer, RESPValue, SimpleError, SimpleString, Array
 
 
 class RESPParser:
@@ -62,6 +62,25 @@ class RESPParser:
                     raise ValueError("Missing RESP2 bulk string terminator")
                 value = BulkString(self.data[next_cursor:end])
                 next_cursor = end + 2
+        elif prefix == b"*":
+            line, next_cursor = self._read_line(self.cursor + 1)
+            length = self._parse_integer(line)
+            if length == -1:
+                value = Array(None)
+            elif length < -1:
+                raise ValueError("Invalid RESP2 array length")
+            else:
+                start = self.cursor
+                self.cursor = next_cursor
+                items: list[RESPValue] = []
+                try:
+                    for _ in range(length):
+                        items.append(self.parse())
+                except (EOFError, ValueError):
+                    self.cursor = start
+                    raise
+                value = Array(items)
+                next_cursor = self.cursor
         else:
             raise ValueError(f"Unsupported RESP2 prefix: {prefix!r}")
 
