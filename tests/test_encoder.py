@@ -1,6 +1,5 @@
 import pytest
 
-from src.redis_python.protocols.encoder import RESPEncoder
 from src.redis_python.protocols.parser import RESPParser
 from src.redis_python.protocols.values import (
     Array,
@@ -69,7 +68,7 @@ from src.redis_python.protocols.values import (
     ],
 )
 def test_encode_resp_value(value: RESPValue, expected: bytes):
-    assert RESPEncoder(value).encode() == expected
+    assert (value).encode() == expected
 
 
 def test_encode_large_flat_array():
@@ -78,7 +77,7 @@ def test_encode_large_flat_array():
         f":{number}\r\n".encode("ascii") for number in range(1000)
     )
 
-    assert RESPEncoder(Array(values)).encode() == expected
+    assert (Array(values)).encode() == expected
 
 
 def test_encoded_values_can_be_parsed_consecutively():
@@ -90,7 +89,7 @@ def test_encoded_values_can_be_parsed_consecutively():
         BulkString(None),
         BulkString(b"a\r\nb"),
     ]
-    data = b"".join(RESPEncoder(value).encode() for value in values)
+    data = b"".join((value).encode() for value in values)
     parser = RESPParser(data)
 
     for expected in values:
