@@ -8,7 +8,7 @@ class CommandHandler:
         self.store = store
 
     def handle(self, command: Array) -> RESP:
-        original_name = command.data[0].data.decode()
+        original_name = command.data[0].data.decode(errors="replace")
         name = command.data[0].data.upper()
         if name == b"GET":
             if command.length != 2:
