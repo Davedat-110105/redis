@@ -138,3 +138,46 @@ def test_invalid_value_does_not_advance_cursor(data: bytes):
     with pytest.raises(ValueError):
         parser.parse()
     assert parser.cursor == 0
+
+
+@pytest.mark.parametrize(
+    ("tail", "error"),
+    [
+        (b"*2\r\n:1\r\n*1\r\n", EOFError),
+        (b"$3\r\nheyXX", ValueError),
+        (b"*2\r\n:1\r\n?x\r\n", ValueError),
+        (b"+\xff\r\n", ValueError),
+        (b"-\xff\r\n", ValueError),
+        (b":1_0\r\n", ValueError),
+    ],
+)
+def test_failed_value_restores_its_start_after_an_earlier_value(tail, error):
+    parser = RESPParser(b"+OK\r\n" + tail)
+    assert parser.parse().data == "OK"
+
+    for _ in range(2):
+        with pytest.raises(error):
+            parser.parse()
+        assert parser.cursor == 5
+
+
+BINARY_SET_COMMAND = b"*3\r\n$3\r\nSET\r\n$3\r\nkey\r\n$5\r\na\r\n\x00\xff\r\n"
+
+
+@pytest.mark.parametrize("split", range(len(BINARY_SET_COMMAND)))
+def test_split_command_preserves_only_the_unfinished_bytes(split):
+    first_chunk = b"+OK\r\n" + BINARY_SET_COMMAND[:split]
+    parser = RESPParser(first_chunk)
+    assert parser.parse().data == "OK"
+
+    with pytest.raises(EOFError):
+        parser.parse()
+    assert parser.cursor == 5
+
+    buffer = first_chunk[parser.cursor:] + BINARY_SET_COMMAND[split:]
+    completed = RESPParser(buffer)
+    result = completed.parse()
+
+    assert isinstance(result, Array)
+    assert [item.data for item in result.data] == [b"SET", b"key", b"a\r\n\x00\xff"]
+    assert completed.cursor == len(BINARY_SET_COMMAND)

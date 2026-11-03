@@ -1,90 +1,96 @@
-"""Parse supported RESP2 values from a byte buffer."""
+"""Parse supported RESP2 values using a byte reader."""
 
+from .byte_reader import ByteReader
 from .values import Array, BulkString, Integer, RESPValue, SimpleError, SimpleString
 
 
 class RESPParser:
-    """Read consecutive RESP2 values from a byte buffer."""
+    """Interpret RESP2 values while ByteReader manages the input position."""
 
     def __init__(self, data: bytes) -> None:
-        self.data = data
-        self.cursor = 0
+        self.reader = ByteReader(data)
+
+    @property
+    def data(self) -> bytes:
+        """Return the input bytes held by the reader."""
+        return self.reader.data
+
+    @property
+    def cursor(self) -> int:
+        """Expose the reader's position so the server can retain unread bytes."""
+        return self.reader.cursor
 
     def parse(self) -> RESPValue:
-        """Parse the next value and advance the cursor on success.
+        """Parse one value, restoring its starting position on failure.
+
+        The checkpoint covers the whole value, including nested array items.
 
         Raises:
             EOFError: If the buffer ends before the value is complete.
             ValueError: If the wire format is invalid or unsupported.
         """
-        start = self.cursor
+        start = self.reader.mark()
         try:
             return self._parse_value()
         except (EOFError, ValueError):
-            self.cursor = start
+            self.reader.reset(start)
             raise
 
     def _parse_value(self) -> RESPValue:
-        if self.cursor >= len(self.data):
-            raise EOFError("No RESP2 value available")
+        """Consume a type prefix and choose the parser for its contents."""
+        prefix = self.reader.read_exact(1)
+        if prefix == b"+":
+            return self._parse_simple_string()
+        if prefix == b"-":
+            return self._parse_error()
+        if prefix == b":":
+            return self._parse_integer_value()
+        if prefix == b"$":
+            return self._parse_bulk_string()
+        if prefix == b"*":
+            return self._parse_array()
+        raise ValueError(f"Unsupported RESP2 prefix: {prefix!r}")
 
-        prefix = self.data[self.cursor : self.cursor + 1]
-        if prefix in (b"+", b"-", b":"):
-            line, next_cursor = self._read_line(self.cursor + 1)
-            if prefix == b":":
-                value: RESPValue = Integer(self._parse_integer(line))
-            else:
-                try:
-                    text = line.decode("utf-8")
-                except UnicodeDecodeError as exc:
-                    raise ValueError("Invalid UTF-8 in RESP2 text") from exc
-                value = SimpleString(text) if prefix == b"+" else SimpleError(text)
-        elif prefix == b"$":
-            line, next_cursor = self._read_line(self.cursor + 1)
-            length = self._parse_integer(line)
-            if length == -1:
-                value = BulkString(None)
-            elif length < -1:
-                raise ValueError("Invalid RESP2 bulk string length")
-            else:
-                end = next_cursor + length
-                if len(self.data) < end + 2:
-                    raise EOFError("Incomplete RESP2 bulk string")
-                if self.data[end : end + 2] != b"\r\n":
-                    raise ValueError("Missing RESP2 bulk string terminator")
-                value = BulkString(self.data[next_cursor:end])
-                next_cursor = end + 2
-        elif prefix == b"*":
-            line, next_cursor = self._read_line(self.cursor + 1)
-            length = self._parse_integer(line)
-            if length == -1:
-                value = Array(None)
-            elif length < -1:
-                raise ValueError("Invalid RESP2 array length")
-            else:
-                self.cursor = next_cursor
-                items: list[RESPValue] = []
-                for _ in range(length):
-                    items.append(self._parse_value())
-                value = Array(items)
-                next_cursor = self.cursor
-        else:
-            raise ValueError(f"Unsupported RESP2 prefix: {prefix!r}")
+    def _parse_simple_string(self) -> SimpleString:
+        return SimpleString(self._read_text_line())
 
-        self.cursor = next_cursor
-        return value
+    def _parse_error(self) -> SimpleError:
+        return SimpleError(self._read_text_line())
 
-    def _read_line(self, start: int) -> tuple[bytes, int]:
-        end = self.data.find(b"\r\n", start)
-        if end == -1:
-            raise EOFError("Incomplete RESP2 line")
-        line = self.data[start:end]
-        if b"\r" in line or b"\n" in line:
-            raise ValueError("Invalid line ending in RESP2 header")
-        return line, end + 2
+    def _parse_integer_value(self) -> Integer:
+        return Integer(self._parse_integer(self.reader.read_line()))
+
+    def _parse_bulk_string(self) -> BulkString:
+        length = self._parse_integer(self.reader.read_line())
+        if length == -1:
+            return BulkString(None)
+        if length < -1:
+            raise ValueError("Invalid RESP2 bulk string length")
+
+        payload = self.reader.read_exact(length)
+        if self.reader.read_exact(2) != b"\r\n":
+            raise ValueError("Missing RESP2 bulk string terminator")
+        return BulkString(payload)
+
+    def _parse_array(self) -> Array:
+        length = self._parse_integer(self.reader.read_line())
+        if length == -1:
+            return Array(None)
+        if length < -1:
+            raise ValueError("Invalid RESP2 array length")
+
+        items = [self._parse_value() for _ in range(length)]
+        return Array(items)
+
+    def _read_text_line(self) -> str:
+        try:
+            return self.reader.read_line().decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError("Invalid UTF-8 in RESP2 text") from exc
 
     @staticmethod
     def _parse_integer(value: bytes) -> int:
+        """Convert a RESP integer or length header into a Python integer."""
         digits = value[1:] if value.startswith(b"-") else value
         if not digits or not digits.isdigit():
             raise ValueError("Invalid RESP2 integer")
